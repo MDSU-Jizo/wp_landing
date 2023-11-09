@@ -33,4 +33,4 @@ wp-includes
 /xmlrpc.php
 
 .idea/
-.DS_Store/
+.DS_Store
