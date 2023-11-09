@@ -1,0 +1,75 @@
+version: "3.7"
+
+services:
+  wordpress:
+    build:
+      context: ./docker
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    env_file:
+      - ./.env
+    volumes:
+      - ./wordpress/data:/var/www/html
+    networks:
+      - traefik
+    labels:
+      # The labels are usefull for Traefik only
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      # Get the routes from http
+      - "traefik.http.routers.wordpressmysite.rule=Host(`${DOMAINE}`)"
+      - "traefik.http.routers.wordpressmysite.entrypoints=web"
+      # Redirect these routes to https
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.wordpressmysite.middlewares=redirect-to-https@docker"
+      # Get the routes from https
+      - "traefik.http.routers.wordpressmysite-secured.rule=Host(`${DOMAINE}`)"
+      - "traefik.http.routers.wordpressmysite-secured.entrypoints=web-secure"
+      # Apply autentificiation with http challenge
+      - "traefik.http.routers.wordpressmysite-secured.tls=true"
+      - "traefik.http.routers.wordpressmysite-secured.tls.certresolver=myhttpchallenge"
+
+  traefik:
+    image: traefik
+    container_name: "traefik"
+    restart: always
+    logging:
+      # Configure the logs retention according to your needs
+      options:
+        max-size: "10m"
+        max-file: "3"
+    env_file:
+      - ./.env
+    command:
+      # Only for development environment
+      - "--log.level=DEBUG"
+      - "--api.insecure=true"
+      # Get Docker as the provider
+      - "--providers.docker=true"
+      # Avoid that all containers are exposed
+      - "--providers.docker.exposedbydefault=false"
+      # Settle the ports for the entry points
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web-secure.address=:443"
+      # Settle the autentification method to http challenge
+      - "--certificatesresolvers.myhttpchallenge.acme.httpchallenge=true"
+      - "--certificatesresolvers.myhttpchallenge.acme.httpchallenge.entrypoint=web"
+      # Uncomment this to get a fake certificate when testing
+      #- "--certificatesresolvers.myhttpchallenge.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # Settle letsencrypt as the certificate provider
+      - "--certificatesresolvers.myhttpchallenge.acme.email=${USER_MAIL}"
+      - "--certificatesresolvers.myhttpchallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    networks:
+      - "traefik"
+    volumes:
+      # Store certificates in ./letsencrypt/acme.json
+      - "./letsencrypt:/letsencrypt"
+      # Connect to Doker socket
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
