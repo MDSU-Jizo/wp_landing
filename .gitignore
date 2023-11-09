@@ -31,3 +31,6 @@ wp-includes
 /wp-signup.php
 /wp-trackback.php
 /xmlrpc.php
+
+.idea/
+.DS_Store/
